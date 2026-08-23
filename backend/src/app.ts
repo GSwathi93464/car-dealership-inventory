@@ -205,31 +205,35 @@ app.post(
       const {
         make,
         model,
+        category,
         year,
         price,
         color,
         mileage,
+        quantity,
         status,
       } = req.body;
 
       if (
         !make ||
         !model ||
+        !category ||
         !year ||
         !price ||
         !color ||
-        mileage === undefined
+        mileage === undefined ||
+        quantity === undefined
       ) {
         return res.status(400).json({
           message:
-            "Make, model, year, price, color and mileage are required",
+            "Make, model, category, year, price, color, mileage and quantity are required",
         });
       }
 
       const result = await pool.query(
         `INSERT INTO cars
-         (make, model, year, price, color, mileage, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         (make, model, year, price, color, mileage, status, category, quantity)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING
            id,
            make,
@@ -239,7 +243,9 @@ app.post(
            color,
            mileage,
            status,
-           created_at`,
+           created_at,
+           category,
+           quantity`,
         [
           make,
           model,
@@ -248,6 +254,8 @@ app.post(
           color,
           mileage,
           status || "available",
+          category,
+          quantity,
         ]
       );
 
@@ -264,7 +272,6 @@ app.post(
     }
   }
 );
-
 // =====================================================
 // GET ALL CARS
 // =====================================================
@@ -279,10 +286,12 @@ app.get(
            id,
            make,
            model,
+           category,
            year,
            price,
            color,
            mileage,
+           quantity,
            status,
            created_at
          FROM cars
@@ -303,6 +312,211 @@ app.get(
 );
 
 // =====================================================
+// SEARCH CARS
+// =====================================================
+
+app.get(
+  "/api/cars/search",
+  authenticateToken,
+  async (req: AuthRequest, res) => {
+    try {
+      const {
+        make,
+        model,
+        category,
+        minPrice,
+        maxPrice,
+      } = req.query;
+
+      const conditions: string[] = [];
+      const values: any[] = [];
+
+      if (make) {
+        values.push(`%${make}%`);
+        conditions.push(`make ILIKE $${values.length}`);
+      }
+
+      if (model) {
+        values.push(`%${model}%`);
+        conditions.push(`model ILIKE $${values.length}`);
+      }
+
+      if (category) {
+        values.push(`%${category}%`);
+        conditions.push(`category ILIKE $${values.length}`);
+      }
+
+      if (minPrice) {
+        values.push(Number(minPrice));
+        conditions.push(`price >= $${values.length}`);
+      }
+
+      if (maxPrice) {
+        values.push(Number(maxPrice));
+        conditions.push(`price <= $${values.length}`);
+      }
+
+      const whereClause =
+        conditions.length > 0
+          ? `WHERE ${conditions.join(" AND ")}`
+          : "";
+
+      const result = await pool.query(
+        `SELECT
+           id,
+           make,
+           model,
+           category,
+           year,
+           price,
+           color,
+           mileage,
+           quantity,
+           status,
+           created_at
+         FROM cars
+         ${whereClause}
+         ORDER BY id DESC`,
+        values
+      );
+
+      return res.status(200).json({
+        cars: result.rows,
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
+        message: "Failed to search cars",
+      });
+    }
+  }
+);
+// =====================================================
+// PURCHASE CAR
+// =====================================================
+
+app.post(
+  "/api/cars/:id/purchase",
+  authenticateToken,
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+
+      const result = await pool.query(
+        `UPDATE cars
+         SET quantity = quantity - 1
+         WHERE id = $1
+           AND quantity > 0
+         RETURNING
+           id,
+           make,
+           model,
+           category,
+           year,
+           price,
+           color,
+           mileage,
+           quantity,
+           status,
+           created_at`,
+        [id]
+      );
+
+      if (result.rows.length === 0) {
+        const car = await pool.query(
+          `SELECT id, quantity
+           FROM cars
+           WHERE id = $1`,
+          [id]
+        );
+
+        if (car.rows.length === 0) {
+          return res.status(404).json({
+            message: "Car not found",
+          });
+        }
+
+        return res.status(400).json({
+          message: "Car is out of stock",
+        });
+      }
+
+      return res.status(200).json({
+        message: "Car purchased successfully",
+        car: result.rows[0],
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
+        message: "Purchase failed",
+      });
+    }
+  }
+);
+// =====================================================
+// RESTOCK CAR - ADMIN ONLY
+// =====================================================
+
+app.post(
+  "/api/cars/:id/restock",
+  authenticateToken,
+  requireAdmin,
+  async (req: AuthRequest, res) => {
+    try {
+      const { id } = req.params;
+      const { quantity } = req.body;
+
+      if (
+        quantity === undefined ||
+        Number(quantity) <= 0
+      ) {
+        return res.status(400).json({
+          message: "Quantity must be greater than 0",
+        });
+      }
+
+      const result = await pool.query(
+        `UPDATE cars
+         SET quantity = quantity + $1
+         WHERE id = $2
+         RETURNING
+           id,
+           make,
+           model,
+           category,
+           year,
+           price,
+           color,
+           mileage,
+           quantity,
+           status,
+           created_at`,
+        [Number(quantity), id]
+      );
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({
+          message: "Car not found",
+        });
+      }
+
+      return res.status(200).json({
+        message: "Car restocked successfully",
+        car: result.rows[0],
+      });
+    } catch (error) {
+      console.error(error);
+
+      return res.status(500).json({
+        message: "Restock failed",
+      });
+    }
+  }
+);
+
+// =====================================================
 // UPDATE CAR
 // =====================================================
 
@@ -313,17 +527,17 @@ app.put(
   async (req: AuthRequest, res) => {
     try {
       const { id } = req.params;
-
-      const {
-        make,
-        model,
-        year,
-        price,
-        color,
-        mileage,
-        status,
-      } = req.body;
-
+const {
+  make,
+  model,
+  category,
+  year,
+  price,
+  color,
+  mileage,
+  status,
+  quantity,
+} = req.body;
       // First check whether the car exists
       const existingCar = await pool.query(
         `SELECT id
@@ -340,37 +554,43 @@ app.put(
 
       // Update only the fields that are provided
       const result = await pool.query(
-        `UPDATE cars
-         SET
-           make = COALESCE($1, make),
-           model = COALESCE($2, model),
-           year = COALESCE($3, year),
-           price = COALESCE($4, price),
-           color = COALESCE($5, color),
-           mileage = COALESCE($6, mileage),
-           status = COALESCE($7, status)
-         WHERE id = $8
-         RETURNING
-           id,
-           make,
-           model,
-           year,
-           price,
-           color,
-           mileage,
-           status,
-           created_at`,
-        [
-          make,
-          model,
-          year,
-          price,
-          color,
-          mileage,
-          status,
-          id,
-        ]
-      );
+  `UPDATE cars
+   SET
+     make = COALESCE($1, make),
+     model = COALESCE($2, model),
+     category = COALESCE($3, category),
+     year = COALESCE($4, year),
+     price = COALESCE($5, price),
+     color = COALESCE($6, color),
+     mileage = COALESCE($7, mileage),
+     status = COALESCE($8, status),
+     quantity = COALESCE($9, quantity)
+   WHERE id = $10
+   RETURNING
+     id,
+     make,
+     model,
+     category,
+     year,
+     price,
+     color,
+     mileage,
+     status,
+     quantity,
+     created_at`,
+  [
+    make,
+    model,
+    category,
+    year,
+    price,
+    color,
+    mileage,
+    status,
+    quantity,
+    id,
+  ]
+);
 
       return res.status(200).json({
         message: "Car updated successfully",
@@ -404,11 +624,13 @@ app.delete(
            id,
            make,
            model,
+           category,
            year,
            price,
            color,
            mileage,
            status,
+           quantity,
            created_at`,
         [id]
       );
@@ -432,4 +654,5 @@ app.delete(
     }
   }
 );
+
 export default app;

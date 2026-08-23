@@ -45,10 +45,12 @@ describe("PUT /api/cars/:id", () => {
       .send({
         make: "Honda",
         model: "Civic",
+        category: "sedan",
         year: 2023,
         price: 25000,
         color: "Black",
         mileage: 15000,
+        quantity: 5,
         status: "available",
       });
 
@@ -71,10 +73,12 @@ describe("PUT /api/cars/:id", () => {
       .send({
         make: "Honda",
         model: "Civic",
+        category: "sedan",
         year: 2024,
         price: 27000,
         color: "White",
         mileage: 10000,
+        quantity: 5,
         status: "sold",
       });
 

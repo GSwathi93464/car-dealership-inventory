@@ -58,14 +58,16 @@ describe("DELETE /api/cars/:id", () => {
       .post("/api/cars")
       .set("Authorization", `Bearer ${token}`)
       .send({
-        make: "Ford",
-        model: "Mustang",
-        year: 2024,
-        price: 45000,
-        color: "Red",
-        mileage: 5000,
-        status: "available",
-      });
+  make: "Toyota",
+  model: "Camry",
+  category: "sedan",
+  year: 2024,
+  price: 28000,
+  color: "White",
+  mileage: 12000,
+  quantity: 1,
+  status: "available",
+});
 
     expect(carResponse.status).toBe(201);
 

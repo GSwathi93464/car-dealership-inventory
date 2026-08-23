@@ -50,14 +50,16 @@ describe("POST /api/cars", () => {
       .post("/api/cars")
       .set("Authorization", `Bearer ${token}`)
       .send({
-        make: "Toyota",
-        model: "Camry",
-        year: 2024,
-        price: 28000,
-        color: "White",
-        mileage: 12000,
-        status: "available",
-      });
+  make: "Toyota",
+  model: "Camry",
+  category: "SUV",
+  year: 2024,
+  price: 28000,
+  color: "White",
+  mileage: 12000,
+  quantity: 5,
+  status: "available",
+});
 
     expect(response.status).toBe(201);
     expect(response.body).toHaveProperty("car");
