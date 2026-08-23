@@ -16,4 +16,10 @@ app.post("/api/auth/register", (req, res) => {
   });
 });
 
+app.post("/api/auth/login", (req, res) => {
+  res.status(200).json({
+    message: "Login successful",
+  });
+});
+
 export default app;
