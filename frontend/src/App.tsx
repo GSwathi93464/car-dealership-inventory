@@ -7,10 +7,12 @@ interface Car {
   id: number;
   make: string;
   model: string;
+  category: string;
   year: number;
   price: number;
   color: string;
   mileage: number;
+  quantity: number;
   status: string;
   created_at: string;
 }
@@ -18,6 +20,7 @@ interface Car {
 function App() {
   const [isLogin, setIsLogin] = useState(true);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [userRole, setUserRole] = useState("");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,6 +29,13 @@ function App() {
   const [message, setMessage] = useState("");
   const [cars, setCars] = useState<Car[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const [category, setCategory] = useState("");
+const [quantity, setQuantity] = useState("");
+const [search, setSearch] = useState("");
+const [categoryFilter, setCategoryFilter] = useState("");
+const [minPrice, setMinPrice] = useState("");
+const [maxPrice, setMaxPrice] = useState("");
 
   // ==========================================
   // CAR FORM STATES
@@ -93,11 +103,70 @@ function App() {
       setLoading(false);
     }
   };
+  const searchCars = async () => {
+  try {
+    const token = localStorage.getItem("token");
+
+    const params = new URLSearchParams();
+
+    if (search) params.append("make", search);
+    if (categoryFilter) params.append("category", categoryFilter);
+    if (minPrice) params.append("minPrice", minPrice);
+    if (maxPrice) params.append("maxPrice", maxPrice);
+
+    const response = await fetch(
+      `${API_URL}/api/cars/search?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    if (response.ok) {
+      setCars(data.cars);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
 
   // ==========================================
   // ADD CAR
   // ==========================================
+  const handlePurchaseCar = async (id: number) => {
+  const token = localStorage.getItem("token");
 
+  if (!token) {
+    setMessage("Please login first.");
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/api/cars/${id}/purchase`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await response.json();
+
+    setMessage(data.message);
+
+    if (response.ok) {
+      fetchCars();
+    }
+  } catch (error) {
+    console.error(error);
+    setMessage("Purchase failed.");
+  }
+};
   const handleAddCar = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -146,6 +215,8 @@ function App() {
       setMessage("Unable to connect to backend.");
     }
   };
+  
+  
 
   // ==========================================
   // START EDIT CAR
@@ -196,14 +267,16 @@ function App() {
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            make,
-            model,
-            year: Number(year),
-            price: Number(price),
-            color,
-            mileage: Number(mileage),
-            status,
-          }),
+  make,
+  model,
+  category,
+  year: Number(year),
+  price: Number(price),
+  color,
+  mileage: Number(mileage),
+  quantity: Number(quantity),
+  status,
+}),
         }
       );
 
@@ -306,13 +379,18 @@ function App() {
       }
 
       if (isLogin) {
-        localStorage.setItem("token", data.token);
+  localStorage.setItem("token", data.token);
 
-        setIsLoggedIn(true);
-        setMessage("Login successful!");
+  const payload = JSON.parse(
+    atob(data.token.split(".")[1])
+  );
 
-        console.log("Login response:", data);
-      } else {
+  setUserRole(payload.role);
+  localStorage.setItem("role", payload.role);
+
+  setIsLoggedIn(true);
+  setMessage("Login successful!");
+} else {
         setMessage("Registration successful!");
         setIsLogin(true);
       }
@@ -331,6 +409,47 @@ function App() {
       fetchCars();
     }
   }, [isLoggedIn]);
+  const handleRestockCar = async (id: number) => {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    setMessage("Please login first.");
+    return;
+  }
+
+  const amount = window.prompt("Enter quantity to restock:");
+
+  if (!amount || Number(amount) <= 0) {
+    return;
+  }
+
+  try {
+    const response = await fetch(
+      `${API_URL}/api/cars/${id}/restock`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          quantity: Number(amount),
+        }),
+      }
+    );
+
+    const data = await response.json();
+
+    setMessage(data.message);
+
+    if (response.ok) {
+      fetchCars();
+    }
+  } catch (error) {
+    console.error(error);
+    setMessage("Restock failed.");
+  }
+};
 
   // ==========================================
   // INVENTORY DASHBOARD
@@ -372,19 +491,68 @@ function App() {
           {/* DASHBOARD HEADER */}
 
           <div className="dashboard-header">
-            <h2>Inventory Dashboard</h2>
+  <h2>Inventory Dashboard</h2>
 
-            <button
-              className="add-car-btn"
-              onClick={() => {
-                resetCarForm();
-                setShowCarForm(true);
-                setMessage("");
-              }}
-            >
-              + Add Car
-            </button>
-          </div>
+  {userRole === "admin" && (
+    <button
+      className="add-car-btn"
+      onClick={() => {
+        resetCarForm();
+        setShowCarForm(true);
+        setMessage("");
+      }}
+    >
+      + Add Car
+    </button>
+  )}
+</div>
+          <div className="search-panel">
+
+  <input
+    type="text"
+    placeholder="Search by make..."
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+  />
+
+  <input
+    type="text"
+    placeholder="Category..."
+    value={categoryFilter}
+    onChange={(e) => setCategoryFilter(e.target.value)}
+  />
+
+  <input
+    type="number"
+    placeholder="Min Price"
+    value={minPrice}
+    onChange={(e) => setMinPrice(e.target.value)}
+  />
+
+  <input
+    type="number"
+    placeholder="Max Price"
+    value={maxPrice}
+    onChange={(e) => setMaxPrice(e.target.value)}
+  />
+
+  <button
+    type="button"
+    className="add-car-btn"
+    onClick={searchCars}
+  >
+    Search
+  </button>
+
+  <button
+    type="button"
+    className="logout-btn"
+    onClick={fetchCars}
+  >
+    Reset
+  </button>
+
+</div>
 
           {/* ADD / EDIT CAR FORM */}
 
@@ -429,6 +597,16 @@ function App() {
                     onChange={(e) => setModel(e.target.value)}
                     required
                   />
+                </div>
+                <div className="form-group">
+                <label>Category</label>
+                <input
+                  type="text"
+                  placeholder="Sedan"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                  required
+                />
                 </div>
 
                 {/* YEAR */}
@@ -485,6 +663,17 @@ function App() {
                     onChange={(e) => setMileage(e.target.value)}
                     required
                   />
+                </div>
+                <div className="form-group">
+                <label>Quantity</label>
+                <input
+                  type="number"
+                  placeholder="10"
+                  min="0"
+                  value={quantity}
+                  onChange={(e) => setQuantity(e.target.value)}
+                  required
+                />
                 </div>
 
                 {/* STATUS */}
@@ -567,10 +756,12 @@ function App() {
                     <th>ID</th>
                     <th>Make</th>
                     <th>Model</th>
+                    <th>Category</th>
                     <th>Year</th>
                     <th>Price</th>
                     <th>Color</th>
                     <th>Mileage</th>
+                    <th>Quantity</th>
                     <th>Status</th>
                     <th>Actions</th>
                   </tr>
@@ -586,16 +777,22 @@ function App() {
 
                       <td>{car.model}</td>
 
+                      <td>{car.category}</td>
+
                       <td>{car.year}</td>
 
                       <td>
-                        ₹{Number(car.price).toLocaleString()}
+                        ₹{Number(car.price).toLocaleString()} 
                       </td>
 
                       <td>{car.color}</td>
 
                       <td>
                         {Number(car.mileage).toLocaleString()} km
+                      </td>
+
+                      <td>
+                      <strong>{car.quantity}</strong>
                       </td>
 
                       <td>
@@ -606,22 +803,38 @@ function App() {
 
                       <td>
 
-                        <button
-                          className="edit-btn"
-                          onClick={() => startEditCar(car)}
-                        >
-                          Edit
-                        </button>
+                        {userRole === "admin" ? (
+  <>
+    <button
+      className="edit-btn"
+      onClick={() => startEditCar(car)}
+    >
+      Edit
+    </button>
 
-                        <button
-                          className="delete-btn"
-                          onClick={() =>
-                            handleDeleteCar(car.id)
-                          }
-                        >
-                          Delete
-                        </button>
+    <button
+      className="delete-btn"
+      onClick={() => handleDeleteCar(car.id)}
+    >
+      Delete
+    </button>
 
+    <button
+      className="restock-btn"
+      onClick={() => handleRestockCar(car.id)}
+    >
+      Restock
+    </button>
+  </>
+) : (
+  <button
+    className="purchase-btn"
+    disabled={car.quantity === 0}
+    onClick={() => handlePurchaseCar(car.id)}
+  >
+    {car.quantity === 0 ? "Out of Stock" : "Purchase"}
+  </button>
+)}
                       </td>
 
                     </tr>
@@ -636,7 +849,7 @@ function App() {
       </div>
     );
   }
-
+  
   // ==========================================
   // LOGIN / REGISTER PAGE
   // ==========================================
