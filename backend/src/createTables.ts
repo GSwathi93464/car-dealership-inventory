@@ -13,7 +13,21 @@ async function createTables() {
       );
     `);
 
-    console.log("Users table created successfully ✅");
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS cars (
+        id SERIAL PRIMARY KEY,
+        make VARCHAR(100) NOT NULL,
+        model VARCHAR(100) NOT NULL,
+        year INTEGER NOT NULL,
+        price NUMERIC(12, 2) NOT NULL,
+        color VARCHAR(50) NOT NULL,
+        mileage INTEGER NOT NULL,
+        status VARCHAR(20) DEFAULT 'available',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    console.log("Users and cars tables created successfully");
   } catch (error) {
     console.error(error);
   } finally {
