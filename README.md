@@ -116,6 +116,28 @@ npm test -- --runInBand
 ```
 
 All implemented tests are passing.
+## Screenshots
+
+### Login Page
+![Login Page](screenshots/login.jpeg)
+
+### Admin Dashboard
+![Admin Dashboard](screenshots/admin_dashboard.jpeg)
+
+### Add Car
+![Add Car](screenshots/add_car.jpeg)
+
+### Inventory
+![Inventory](screenshots/inventory1.jpeg)
+
+### Inventory Search / Filter
+![Inventory Search](screenshots/inventory2.jpeg)
+
+### Admin Delete
+![Admin Delete](screenshots/admin_delete.jpeg)
+
+### Admin Restock
+![Admin Restock](screenshots/admin_restock.jpeg)
 
 ## Project Highlights
 
